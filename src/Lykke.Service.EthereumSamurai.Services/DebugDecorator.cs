@@ -58,9 +58,10 @@ namespace Lykke.Service.EthereumSamurai.Services
                "jsonrpc": "2.0"
              }
              */
+            var guid = Guid.NewGuid().ToString();
             CustomRpcRequest request = new CustomRpcRequest()
             {
-                Id = "1",
+                Id = guid,
                 Method = "trace_transaction",//"debug_traceTransaction",
                 Params = new List<object>()
                 {
@@ -68,11 +69,18 @@ namespace Lykke.Service.EthereumSamurai.Services
                 }
             };
 
-            byte[] byteArray = Encoding.ASCII.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(request));
+            var serialized = Newtonsoft.Json.JsonConvert.SerializeObject(request);
+            byte[] byteArray = Encoding.ASCII.GetBytes(serialized);
             MemoryStream stream = new MemoryStream(byteArray);
             HttpResponseMessage response = await _httpClient.PostAsync(_settings.EthereumRpcUrl, new StreamContent(stream));
             var responseString = await response.Content.ReadAsStringAsync();
             ParityTransactionTraceResponse traceResponse = (ParityTransactionTraceResponse)Newtonsoft.Json.JsonConvert.DeserializeObject(responseString, typeof(ParityTransactionTraceResponse));
+            if (traceResponse?.TransactionTrace == null)
+            {
+                //Means there is no trace for transaction hash;
+                return null;
+            }
+
             string errorMessage = traceResponse.TransactionTrace.FirstOrDefault()?.Error;
             IEnumerable<TransferValueModel> transfers = null;
             bool hasError = !string.IsNullOrEmpty(errorMessage);
